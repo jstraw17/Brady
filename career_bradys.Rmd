@@ -1,0 +1,471 @@
+---
+title: "The Brady: By Which All Else Are Measured"
+author: "Jeff Straw"
+date: "1/4/2021"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = F, message = F)
+
+library(dplyr)
+library(ggplot2)
+library(stringr)
+library(scales)
+library(rvest)
+
+# Tom Brady's Career Stats
+brady_stats <- read.csv("brady_career_stats.txt", header = T, sep = ",", check.names = F)[-c(22),]
+
+
+# bradys <- read.csv("num_of_bradys.txt", header = T, sep = ",", check.names = F)
+# bradys$Player <- gsub("\\\\.*","",bradys$Player)
+# colnames(bradys)[9] <- "WLPercent"
+
+every_brady <- read.csv("all_bradys.txt", header = T, sep = ",", check.names = F)
+
+one_int <- read.csv("plus_one_int.txt", header = T, sep = ",", check.names = F)
+
+playoff_bradys <- read.csv("playoff_bradys.txt", header = T, sep = ",", check.names = F)
+
+every_brady$Playoff <- F
+one_int$Playoff <- F
+playoff_bradys$Playoff <- T
+
+bradys <- rbind(every_brady,one_int,playoff_bradys)
+
+# Records for every passer rating >= 100 game
+pr100 <- read.csv("PR100.txt", header = T, sep = ",", check.names = F)
+
+qb2020 <- read.csv("all_qb_stats_2020.txt", header = T, sep = ",", check.names = F)
+
+
+# Win Rate with Passer Rating of >= 100
+sum(pr100$`W-L%`*pr100$Count)/sum(pr100$Count)
+
+bradys <- subset(bradys, select = -c(Rk))
+num_of_bradys <- length(bradys$Player)
+bradys$Player <- gsub("\\\\.*","",bradys$Player)
+colnames(bradys)[6] <- "At"
+colnames(bradys)[20] <- "SkYds"
+bradys$Date <- as.Date(bradys$Date)
+bradys$AgeDays <- (bradys$Age - floor(bradys$Age))*1000
+bradys$Age <- floor(bradys$Age)
+bradys$At <- gsub("@","Away", bradys$At)
+bradys$At[bradys$At == ""] <- gsub("","Home",bradys$At[bradys$At == ""])
+a <- unlist(strsplit(bradys$Result, " "))
+bradys$Result <- a[seq(1,length(a), 2)]
+bradys$Score <- a[seq(2,length(a), 2)]
+bradys$PF <- unlist(strsplit(bradys$Score,"-"))[seq(1,length(unlist(strsplit(bradys$Score,"-"))),2)]
+bradys$PA <- unlist(strsplit(bradys$Score,"-"))[seq(2,length(unlist(strsplit(bradys$Score,"-"))),2)]
+bradys$PD <- as.numeric(bradys$PF) - as.numeric(bradys$PA)
+b <- unlist(strsplit(as.character(bradys$Date),"-"))
+bradys$Year <- as.numeric(b[seq(1,length(b),3)])
+bradys$Month <- as.numeric(b[seq(2,length(b),3)])
+bradys$DayOfMonth <- as.numeric(b[seq(3,length(b),3)])
+bradys$Season <- ifelse(bradys$Month >= 6, bradys$Year, bradys$Year-1)
+
+league_pr <- read.csv("league_pr.txt", header = T, sep = ",", check.names = F)
+```
+
+## Introduction
+
+
+<center>
+![Sup](https://media.giphy.com/media/64jVVzB87tzG/giphy.gif)
+</center>
+
+
+## Birth of the Idea
+
+
+-Inspired by the idea of the LeBron stat line, which is Points/Rebounds/Assists that are greater than or equal to his career averages (27/7/7)
+-Similarities in competitiveness/drive/motivation/dedication
+-Both can be considered the best in the last 20 years, if not of all time
+
+# Why come up with the idea of this meteric?
+
+-Unlike the NBA, which has double- and triple-doubles, 30 or 40 point games, the NFL has no easy option
+-Passer Rating is directly correlated to the Brady, but can be messy (example "Stat Sheet Misconceptions: Passer Rating | PFF News & Analysis")
+--Favors high attempts, high comp % (west coast offense) over gunslinging (high yds / attempt, but lower comp %)
+-Having a Brady is approximately the same as having a PR of ~100-105, depending on attempts and completions
+
+9/15 120 yds 1td 0int -> passer rating of 107.64
+22/35 250 yds 2td 0 int -> passer rating of 103.27
+
+
+-Pros:
+--Easy to read
+--Rewards consistent, effective football
+
+-Cons:
+--Like passer rating, has a generational bias (increase in scoring, decrease in int%)
+
+
+-Why the 0 int?
+--Win % going from 0 int to 1 int is 60.7% wr to 76.2% wr, over 25% increase
+
+-Career winrate for Brady = 76%, winrate of a Brady = 76%
+```{r mmm}
+# qb2020$Player <- gsub("\\\\.*","",qb2020$Player)
+# colnames(qb2020)[7] <- "At"
+# colnames(qb2020)[21] <- "SkYds"
+# qb2020$Date <- as.Date(qb2020$Date)
+# qb2020$AgeDays <- (qb2020$Age - floor(qb2020$Age))*1000
+# qb2020$Age <- floor(qb2020$Age)
+# qb2020$At <- gsub("@","Away", qb2020$At)
+# qb2020$At[qb2020$At == ""] <- gsub("","Home",qb2020$At[qb2020$At == ""])
+# a <- unlist(strsplit(qb2020$Result, " "))
+# qb2020$Result <- a[seq(1,length(a), 2)]
+# qb2020$Score <- a[seq(2,length(a), 2)]
+# qb2020$PF <- unlist(strsplit(qb2020$Score,"-"))[seq(1,length(unlist(strsplit(qb2020$Score,"-"))),2)]
+# qb2020$PA <- unlist(strsplit(qb2020$Score,"-"))[seq(2,length(unlist(strsplit(qb2020$Score,"-"))),2)]
+# qb2020$PD <- as.numeric(qb2020$PF) - as.numeric(qb2020$PA)
+# qb2020$ResultValue <- qb2020$Result %>% gsub("W",1,.) %>% gsub("T",0.5,.) %>% gsub("L",0,.)
+
+```
+
+
+```{r math}
+num_of_bradys <- length(every_brady$Rk)
+every_brady$Player <- gsub("\\\\.*","",every_brady$Player)
+colnames(every_brady)[7] <- "At"
+colnames(every_brady)[21] <- "SkYds"
+every_brady$Date <- as.Date(every_brady$Date)
+every_brady$AgeDays <- (every_brady$Age - floor(every_brady$Age))*1000
+every_brady$Age <- floor(every_brady$Age)
+every_brady$At <- gsub("@","Away", every_brady$At)
+every_brady$At[every_brady$At == ""] <- gsub("","Home",every_brady$At[every_brady$At == ""])
+a <- unlist(strsplit(every_brady$Result, " "))
+every_brady$Result <- a[seq(1,length(a), 2)]
+every_brady$Score <- a[seq(2,length(a), 2)]
+every_brady$PF <- unlist(strsplit(every_brady$Score,"-"))[seq(1,length(unlist(strsplit(every_brady$Score,"-"))),2)]
+every_brady$PA <- unlist(strsplit(every_brady$Score,"-"))[seq(2,length(unlist(strsplit(every_brady$Score,"-"))),2)]
+every_brady$PD <- as.numeric(every_brady$PF) - as.numeric(every_brady$PA)
+
+# One Int Win %
+
+one_int_wins <- one_int %>% filter(Result == "W")
+one_int_ties <- one_int %>% filter(Result == "T")
+one_int_losses <- one_int %>% filter(Result == "L")
+(length(one_int_wins$Rk) + 0.5*length(one_int_ties$Rk))/length(one_int$Rk)
+
+
+b <- unlist(strsplit(as.character(every_brady$Date),"-"))
+every_brady$Year <- as.numeric(b[seq(1,length(b),3)])
+every_brady$Month <- as.numeric(b[seq(2,length(b),3)])
+every_brady$DayOfMonth <- as.numeric(b[seq(3,length(b),3)])
+every_brady$Season <- ifelse(every_brady$Month >= 6, every_brady$Year, every_brady$Year-1)
+ 
+every_brady %>% group_by(Player,Season) %>%
+  summarise(total = n(),
+            is_brady = mean(ifelse(Player == "Tom Brady",T,F))) %>%
+ggplot(aes(x = as.Date(paste0(Season,"-8-1"),"%Y"), y = total, fill=as.factor(is_brady))) + 
+  geom_bar(stat = "identity") +
+  theme_bw() +
+  scale_x_date(breaks = as.Date(c("1950-1-1", "1960-1-1", "1970-1-1", "1980-1-1", "1990-1-1","2000-1-1", "2010-1-1", "2020-1-1")), 
+               labels = date_format("%Y")
+               ) +
+  theme(axis.text.x = element_text(angle=45))
+
+colnames(league_pr)[18] <- "SkYds"
+ggplot(league_pr) +
+  geom_line(aes(x = Year, y = Rate))
+
+
+# Number of bradys each season by int or no int
+
+bradys %>% group_by(Season, Int) %>% tally() %>%
+  ggplot(aes(x = Season, y = n, fill = as.factor(Int))) +
+  geom_bar(stat = "identity", position = 'dodge')
+
+bradys %>% group_by(Season,Result ) %>% tally()
+```
+
+```{r mm}
+# Win Percentage when having a Brady by Season
+wp_by_season <-every_brady %>% group_by(Season,Result) %>%
+  summarise(total = n()/length(every_brady$Season[every_brady$Season == Season]))
+
+wp_by_season %>% ggplot(aes(x = as.Date(paste0(Season,"-8-1"),"%Y"), y = total, fill=as.factor(Result))) + 
+  geom_bar(stat = "identity") +
+  theme_bw() +
+  scale_x_date(breaks = as.Date(c("1950-1-1", "1960-1-1", "1970-1-1", "1980-1-1", "1990-1-1","2000-1-1", "2010-1-1", "2020-1-1")), 
+               labels = date_format("%Y")
+               ) +
+  theme(axis.text.x = element_text(angle=45))
+
+by_season <- every_brady %>% group_by(Season)
+
+wins_by_season <- by_season %>% filter(Result == "W") %>% tally()
+ties_by_season <- by_season %>% filter(Result == "T") %>% tally()
+ties_by_season$n <- ties_by_season$n * 0.5
+total_by_season <- by_season %>% tally()
+                                    
+c <- merge(rbind(wins_by_season,ties_by_season) %>% group_by(Season) %>%
+  summarise(sum = sum(n)),total_by_season)
+wp_by_season <- c$sum/c$n
+wp_by_season
+
+total_by_season
+every_brady %>% group_by(Player,Age) %>%
+  summarise(total = n(),
+            is_brady = mean(ifelse(Player == "Tom Brady",T,F))) %>%
+ggplot(aes(x = Age, y = total, fill=as.factor(is_brady))) + 
+  geom_bar(stat = "identity") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle=45))
+
+
+
+  
+every_brady %>% group_by(Player,PD,Result) %>%
+  summarise(total = n(),
+            is_brady = mean(ifelse(Player == "Tom Brady",T,F))) %>%
+ggplot(aes(x = PD, y = total, fill=as.factor(is_brady))) + 
+  geom_bar(stat = "identity") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle=45))
+
+
+
+
+# Average age of a player having a brady
+mean(every_brady$Age + every_brady$AgeDays/365)
+median(every_brady$Age)
+unique(every_brady$Age)[which.max(tabulate(match(every_brady$Age,unique(every_brady$Age))))]
+
+
+
+# Average age of brady's bradys
+every_brady %>% filter(Player == "Tom Brady") %>% summarise(meanAge = mean(Age + AgeDays/365.25))
+
+every_brady %>% filter(Player == "Drew Brees") %>% summarise(meanAge = mean(Age + AgeDays/365.25))
+
+every_brady %>% filter(Player == "Peyton Manning") %>% summarise(meanAge = mean(Age + AgeDays/365.25))
+
+every_brady %>% group_by(Result) %>%
+  summarise(total = n()) %>% 
+  # arrange(desc(total)) %>%
+  mutate(prop = total/sum(total) * 100) %>%
+  mutate(ypos = cumsum(prop) - 0.5*prop) %>%
+  # arrange(desc(total)) %>%
+ggplot(aes(x = "", y = total, fill=Result)) + 
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = paste0(round(prop,1),"%")), 
+            position = position_stack(vjust=0.5)) +
+  theme_void() +
+  coord_polar("y",start=0) +
+   
+  scale_fill_brewer(palette = "Set1")
+  
+
+
+mean(every_brady$`Cmp%`)
+
+
+home_vs_away <- every_brady %>% group_by(At) %>% summarise(
+  at_percentage = n()/length(every_brady$At))
+home_vs_away
+
+by_at_result <- every_brady %>% group_by(At,Result) %>% summarise(
+  total = n()/length(every_brady$At))
+every_brady %>% filter(At == "Away") %>% filter(Result == "W")
+
+
+
+# Most Bradys in a season
+by_player_season <- every_brady %>% group_by(Player,Season) %>% summarise(
+  total = n()
+) %>% arrange(desc(total))
+
+# Most time between Bradys
+by_player_time_first_last <- every_brady %>% group_by(Player) %>% summarise(
+  first = min(Date),
+  last = max(Date),
+  time_between = last-first
+) %>% arrange(desc(time_between))
+
+# Generate game code, eg. NWE_NYJ_13_2020
+# Format: (Away)_(Home)_(Week)_(Season)
+
+every_brady$Game <- ifelse(every_brady$At == "Home", paste(every_brady$Opp, every_brady$Tm, every_brady$Week, every_brady$Season, sep = "_"), paste(every_brady$Tm, every_brady$Opp, every_brady$Week, every_brady$Season, sep = "_"))
+
+# Games with two Bradys on one team
+two_Brady_games <- every_brady %>% group_by(Game) %>% filter(n() > 1) %>% arrange(desc(Date))
+
+# Games with two Bradys on one team
+every_brady %>% group_by(Game,Tm) %>% filter(n() > 1) %>% arrange(desc(Tm))  
+
+two_Brady_games
+  
+# Birthday bradys by Date
+every_brady %>% filter(AgeDays == 0) %>% arrange(desc(Date))
+
+# Birthday Bradys by Age
+every_brady %>% filter(AgeDays == 0) %>% arrange(desc(Age))
+  
+f <- every_brady %>% filter(Rate >= 100) %>% group_by(Result) %>% summarise(n = n()) %>% summarise(n/sum(n))
+f[3,] + 0.5*f[2,]
+
+ggplot(bradys, aes(Season, tally(group_by(Season,Int)), fill=as.factor(Int)))
+```
+
+```{r seasons}
+percent_of_bradys_by_season <- by_season%>% tally()
+percent_of_bradys_by_season$n <- percent_of_bradys_by_season$n/num_of_bradys
+percent_of_bradys_by_season
+summary(lm(n ~ Season, data = percent_of_bradys_by_season))
+```
+
+```{r franchises}
+every_brady_backup <- every_brady
+every_brady$Opp_Franchise <- every_brady$Opp
+every_brady$Tm_Franchise <- every_brady$Tm
+# Titans
+every_brady[ifelse((every_brady$Season < 2002) & (every_brady$Opp == 'HOU'),T,F),'Opp_Franchise'] = 'TEN'
+# Patriots
+every_brady[ifelse((every_brady$Season < 1971) & (every_brady$Opp == 'BOS'),T,F),'Opp_Franchise'] = 'NWE'
+# Raiders
+every_brady[ifelse((every_brady$Opp == 'OAK'),T,F),'Opp_Franchise'] = 'LVR'
+every_brady[ifelse((every_brady$Opp == 'RAI'),T,F),'Opp_Franchise'] = 'LVR'
+# Cardinals
+every_brady[ifelse((every_brady$Opp == 'CRD'),T,F),'Opp_Franchise'] = 'ARI'
+every_brady[ifelse((every_brady$Opp == 'PHO'),T,F),'Opp_Franchise'] = 'ARI'
+every_brady[ifelse((every_brady$Season >= 1960) & (every_brady$Season <= 1987) & (every_brady$Opp == 'STL'),T,F),'Opp_Franchise'] = 'ARI'
+# Chargers
+every_brady[ifelse((every_brady$Opp == 'SDG'),T,F),'Opp_Franchise'] = 'LAC'
+# Chiefs
+every_brady[ifelse((every_brady$Opp == 'DTX'),T,F),'Opp_Franchise'] = 'KAN'
+# Colts
+every_brady[ifelse((every_brady$Season < 1996) & (every_brady$Opp == 'BAL'),T,F),'Opp_Franchise'] = 'IND'
+# Rams
+every_brady[ifelse((every_brady$Season >= 1995) & (every_brady$Season <= 2015) & (every_brady$Opp == 'STL'),T,F),'Opp_Franchise'] = 'LAR'
+every_brady[ifelse((every_brady$Opp == 'RAM'),T,F),'Opp_Franchise'] = 'LAR'
+by_opp <- every_brady %>% group_by(Opp_Franchise)
+bradys_against <- by_opp %>% tally() %>% arrange(desc(n))
+bradys_against
+
+# Titans
+every_brady[ifelse((every_brady$Season < 2002) & (every_brady$Tm == 'HOU'),T,F),'Tm_Franchise'] = 'TEN'
+# Patriots
+every_brady[ifelse((every_brady$Season < 1971) & (every_brady$Tm == 'BOS'),T,F),'Tm_Franchise'] = 'NWE'
+# Raiders
+every_brady[ifelse((every_brady$Tm == 'OAK'),T,F),'Tm_Franchise'] = 'LVR'
+every_brady[ifelse((every_brady$Tm == 'RAI'),T,F),'Tm_Franchise'] = 'LVR'
+# Cardinals
+every_brady[ifelse((every_brady$Tm == 'CRD'),T,F),'Tm_Franchise'] = 'ARI'
+every_brady[ifelse((every_brady$Tm == 'PHO'),T,F),'Tm_Franchise'] = 'ARI'
+every_brady[ifelse((every_brady$Season >= 1960) & (every_brady$Season <= 1987) & (every_brady$Tm == 'STL'),T,F),'Tm_Franchise'] = 'ARI'
+# Chargers
+every_brady[ifelse((every_brady$Tm == 'SDG'),T,F),'Tm_Franchise'] = 'LAC'
+# Chiefs
+every_brady[ifelse((every_brady$Tm == 'DTX'),T,F),'Tm_Franchise'] = 'KAN'
+# Colts
+every_brady[ifelse((every_brady$Season < 1996) & (every_brady$Tm == 'BAL'),T,F),'Tm_Franchise'] = 'IND'
+# Rams
+every_brady[ifelse((every_brady$Season >= 1995) & (every_brady$Season <= 2015) & (every_brady$Tm == 'STL'),T,F),'Tm_Franchise'] = 'LAR'
+every_brady[ifelse((every_brady$Tm == 'RAM'),T,F),'Tm_Franchise'] = 'LAR'
+# Jets
+every_brady[ifelse((every_brady$Tm == 'NYT'),T,F),'Tm_Franchise'] = 'NYJ'
+
+by_tm <- every_brady %>% group_by(Tm_Franchise)
+bradys_for <- by_tm %>% tally() %>% arrange(desc(n))
+bradys_for
+colnames(bradys_for) <- c('Team','For')
+colnames(bradys_against) <- c('Team', 'Against')
+bradys_by_franchise <- merge(bradys_for, bradys_against, by = 'Team')
+bradys_by_franchise$diff <- bradys_by_franchise$For - bradys_by_franchise$Against
+
+
+# Top 3 QBs of Top 5 Franchises in Bradys
+every_brady$Tm_Franchise <- as.factor(every_brady$Tm_Franchise)
+bradys_by_franchise %>% arrange(desc(diff))
+every_brady %>% group_by(Tm_Franchise,Player) %>% filter(Tm_Franchise %in% c('GNB','NWE','LAC','IND','SFO')) %>% tally() %>% arrange(desc(n)) %>% top_n(3)
+```
+
+
+```{r cars}
+brady_stats
+the_brady_stat_line <- colSums(brady_stats[,c(12:13,15)], na.rm = T)/sum(brady_stats$G)
+the_brady_stat_line
+263/35
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+
+rbind(every_brady,one_int) %>% filter(TD >= 3) %>% filter(Yds >= 300) %>% filter(Int <= 1) %>% group_by(Player) %>% tally() %>% arrange(desc(n))
+
+
+# wp_brady_game <- (sum(bradys$W) + 0.5*sum(bradys$T))/(sum(bradys$W) + sum(bradys$L) + sum(bradys$T))
+# 
+# brady_wins <- sum(as.numeric(unlist(record)[c(T,F,F)]))
+# brady_losses <- sum(as.numeric(unlist(record)[c(F,T,F)]))
+# brady_ties <- sum(as.numeric(unlist(record)[c(F,F,T)]))
+# brady_win_percent <- brady_wins/sum(brady_stats$G)
+# 
+# wp_brady_game
+# brady_win_percent
+
+
+
+
+# by_bradys <- bradys[order(as.integer(bradys$Count),decreasing = F), ] %>% group_by(Count)
+# 
+# w_percent_by_num_of_bradys <- by_bradys %>% summarise(
+#   WLPercent = mean(WLPercent)
+# )
+# 
+# temp <- by_bradys %>% summarise(
+#     WLPercent = sum(WLPercent),
+#     newCount = sum(Count),
+#     NumPlayers = newCount/unique(Count)
+# )
+# temp2 <- data.frame('x' = temp$Count, 'y' = (temp$WLPercent/temp$NumPlayers))
+# 
+# cumsum(temp$WLPercent*temp$Count)/cumsum(temp$newCount)
+# 
+# # ggplot(w_percent_by_num_of_bradys, aes(x = Count, y = WLPercent)) + 
+# #   geom_point() +
+# #   geom_smooth()
+# 
+# lm.fit <- lm(WLPercent ~ log(Count), data = bradys)
+# summary(lm.fit)
+# residuals(lm.fit)
+# fitted(lm.fit)
+# plot(fitted(lm.fit),residuals(lm.fit))
+# lm.fit.averages <- lm(y ~ log(x), data = temp2)
+# summary(lm.fit.averages)
+# sigma(lm.fit.averages)
+# plot(fitted(lm.fit.averages),residuals(lm.fit.averages)/sigma(lm.fit.averages))
+# 
+# wts <- 1/fitted(lm(abs(residuals(lm.fit.averages))~fitted(lm.fit.averages)))^2
+# wts
+# 
+# fit3 <- lm(y~log(x), data = temp2, weights = wts)
+# plot(fitted(fit3),residuals(fit3)/sigma(fit3))
+# sigma(fit3)
+# 
+# ggplot(bradys, aes(x=Count, y = WLPercent)) +
+#   geom_point() +
+#   geom_hline(yintercept = wp_brady_game, color = "red", linetype = "dashed") +
+#   # stat_function(fun = nat_exp_growth) +
+#   geom_smooth(method = "lm", formula = y~log(x), se=T) +
+#   geom_point(data = temp2, aes(x=x,y=y), color = "red")
+# 
+# ggplot(temp2, aes(x=x,y=y)) +
+#   geom_point() +
+#   geom_smooth(method="lm", formula = y~log(x)) + ylim(0,1)
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
